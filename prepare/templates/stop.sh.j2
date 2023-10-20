@@ -1,0 +1,21 @@
+#!/bin/bash
+
+cd $(dirname $0)
+
+{% for chain in chains -%}
+{% for index in range(chain.validators | length) -%}
+{% set name = chain.validators[index].moniker | lower -%}
+{% if podman %}
+{% set command = "podman" %}
+{% else %}
+{% set command = "docker" %}
+{% endif %}
+{{ command }} kill {{ name }}
+{% if chain.name == "Kujira" -%}
+{{ command }} kill {{ "feeder%02d" % (index + 1) }}
+{% endif %}
+{% endfor -%}
+{% endfor %}
+{% if podman %}
+podman pod kill pond
+{% endif %}
