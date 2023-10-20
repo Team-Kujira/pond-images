@@ -257,7 +257,7 @@ def main():
             "validators": []
         }
 
-        for index, validator in  enumerate(chain.validators):
+        for validator in chain.validators:
             validator["rpc_url"] = f"http://localhost:{validator['rpc_port']}"
             validator.pop("rpc_port")
             validator.pop("amount")

@@ -15,8 +15,6 @@ RUN mkdir bin lib && \
 
 FROM ubuntu:latest
 
-# RUN apt-get update && apt-get upgrade -y
-
 COPY --from=build /dist/bin/* /usr/local/bin/
 COPY --from=build /dist/lib/* /usr/lib/
 
