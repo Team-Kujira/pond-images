@@ -163,7 +163,7 @@ class Chain:
                 if v["node_id"] == node_id:
                     continue
                 port = f"{self.port_prefix}{i+1:02}{56}"
-                host = info["moniker"].lower()
+                host = v["moniker"].lower()
                 if self.podman:
                     host = "127.0.0.1"
                 persistent_peers.append(f"{v['node_id']}@{host}:{port}")
