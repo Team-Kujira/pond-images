@@ -18,6 +18,7 @@ class Chain:
     port_prefix = 1
     podman = False
     rpc_port = ""
+    api_port = ""
 
     def __init__(self, name, chain_id, denom, num_validators, port_prefix, podman):
         self.name = name
@@ -39,6 +40,7 @@ class Chain:
 
             info, gentx = self.prepare_gentxs(chain_id, home)
             info["rpc_port"] = f"{self.port_prefix}{i:02}57"
+            info["api_port"] = f"{self.port_prefix}{i:02}17"
             self.validators.append(info)
 
             gentxs.append(gentx)
@@ -259,11 +261,13 @@ def main():
 
         for validator in chain.validators:
             validator["rpc_url"] = f"http://localhost:{validator['rpc_port']}"
+            validator["api_url"] = f"http://localhost:{validator['api_port']}"
             validator.pop("rpc_port")
+            validator.pop("api_port")
             validator.pop("amount")
 
             chain_info["validators"].append(validator)
-    
+
         info["chains"][chain.chain_id] = chain_info
 
     json.dump(info, open(f"{WORKDIR}/info.json", "w"))

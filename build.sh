@@ -1,16 +1,30 @@
 #!/bin/bash
 
+cmd=""
 action=build
-if [ $# -eq 1 ] && [ "$1" == "manifest" ]; then
-    action=manifest
+namespace="teamkujira"
+if [ $# -gt 0 ]; then
+    if [ "$1" == "manifest" ]; then
+        action=manifest
+    fi
+
+    if [ "$1" == "docker" ] || [ "$1" == "podman" ]; then
+        cmd="$1"
+    fi
+
+    if [ $# -eq 2 ]; then
+        namespace=$2
+    fi
 fi
 
-if [ -n "$(which docker)" ]; then
-    cmd=docker
-elif [ -n "$(which podman)" ]; then
-    cmd=podman
-else
-    exit 1
+if [ -z "$cmd" ]; then
+    if [ -n "$(which docker)" ]; then
+        cmd=docker
+    elif [ -n "$(which podman)" ]; then
+        cmd=podman
+    else
+        exit 1
+    fi
 fi
 
 arch=$(arch)
@@ -18,7 +32,7 @@ arch=$(arch)
 # kujirad
 go_version=1.20.2
 kujira_version=v0.9.0
-tag=teamkujira/kujirad:${kujira_version}
+tag=${namespace}/kujirad:${kujira_version}
 
 if [ "$action" == "build" ]; then
     $cmd build \
@@ -38,7 +52,7 @@ fi
 # feeder
 go_version=1.20.2
 feeder_version=next
-tag=teamkujira/feeder:${feeder_version}
+tag=${namespace}/feeder:${feeder_version}
 
 if [ "$action" == "build" ]; then
     $cmd build \
@@ -58,7 +72,7 @@ fi
 
 # prepare
 prepare_version=latest
-tag=teamkujira/prepare:${prepare_version}
+tag=${namespace}/prepare:${prepare_version}
 
 if [ "$action" == "build" ]; then
     $cmd build \
