@@ -39,6 +39,7 @@ class Chain:
 
             info, gentx = self.prepare_gentxs(chain_id, home)
             info["rpc_port"] = f"{self.port_prefix}{i:02}57"
+            info["api_port"] = f"{self.port_prefix}{i:02}17"
             self.validators.append(info)
 
             gentxs.append(gentx)
@@ -227,30 +228,19 @@ def main():
     if not os.path.isdir(WORKDIR):
         os.mkdir(WORKDIR)
 
+    config = {
+        "command": "docker",
+        "chains": {}
+    }
+
+    if args.podman:
+        config["command"] = "podman"
+
     chains = [
         Chain("Kujira", "pond-1", "ukuji", args.nodes, 1, args.podman),
         # Chain("Faker", "faker-1", "ufake", 1, 2)
     ]
 
-    start = jinja2.Template(open("templates/start.sh.j2", "r").read())
-    open(f"{WORKDIR}/start.sh", "w").write(
-        start.render({
-            "podman": args.podman,
-            "chains": chains
-        })
-    )
-
-    stop = jinja2.Template(open("templates/stop.sh.j2", "r").read())
-    open(f"{WORKDIR}/stop.sh", "w").write(
-        stop.render({
-            "podman": args.podman,
-            "chains": chains
-        })
-    )
-
-    info = {
-        "chains": {}
-    }
     for chain in chains:
         chain_info = {
             "name": chain.name,
@@ -259,17 +249,16 @@ def main():
 
         for validator in chain.validators:
             validator["rpc_url"] = f"http://localhost:{validator['rpc_port']}"
+            validator["api_url"] = f"http://localhost:{validator['api_port']}"
             validator.pop("rpc_port")
+            validator.pop("api_port")
             validator.pop("amount")
 
             chain_info["validators"].append(validator)
-    
-        info["chains"][chain.chain_id] = chain_info
 
-    json.dump(info, open(f"{WORKDIR}/info.json", "w"))
+        config["chains"][chain.chain_id] = chain_info
 
-    os.chmod(f"{WORKDIR}/start.sh", 0o755)
-    os.chmod(f"{WORKDIR}/stop.sh", 0o755)
+    json.dump(config, open(f"{WORKDIR}/pond.json", "w"))
 
 
 if __name__ == "__main__":
