@@ -179,6 +179,19 @@ class Chain:
 
         self.wait_for(result["txhash"])
 
+    def get_contracts(self):
+        contracts = {}
+        result = self.q("wasm list-codes")
+        for index in range(len(result["code_infos"])):
+            id = index + 1
+            contracts[id] = {}
+            result = self.q(f"wasm list-contract-by-code {id}")
+            for contract in result["contracts"]:
+                result = self.q(f"wasm contract {contract}")
+                contracts[id][contract] = result["contract_info"]["label"]
+
+        print(json.dumps(contracts, indent=2))
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -201,6 +214,8 @@ def main():
         "name": "fin",
         "id": 134
     }]
+
+    kujira.get_contracts()
 
     result = kujira.q("wasm list-codes")
     if result["code_infos"]:
