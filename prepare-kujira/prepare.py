@@ -149,8 +149,8 @@ class Chain:
         config_toml = jinja2.Template(
             open("templates/config.toml.j2", "r").read()
         )
-        feeder_toml = jinja2.Template(
-            open("templates/feeder.toml.j2", "r").read()
+        client_toml = jinja2.Template(
+            open("templates/client.toml.j2", "r").read()
         )
 
         for index, info in enumerate(self.validators):
@@ -176,7 +176,6 @@ class Chain:
                 "rpc_port": f"{self.port_prefix}{num}{57}",
                 "abci_port": f"{self.port_prefix}{num}{58}",
                 "pprof_port": f"{self.port_prefix}{num}{60}",
-                "feeder_port": f"{self.port_prefix}{num}{71}",
                 "persistent_peers": ",".join(persistent_peers),
                 "moniker": info["moniker"],
                 "address": info["address"],
@@ -193,17 +192,8 @@ class Chain:
                 config_toml.render(config)
             )
 
-            if self.denom != "ukuji":
-                continue
-
-            home = f"{WORKDIR}/feeder{num}"
-            if os.path.isdir(home):
-                continue
-
-            os.mkdir(home)
-
-            open(f"{home}/config.toml", "w").write(
-                feeder_toml.render(config)
+            open(f"{home}/config/client.toml", "w").write(
+                client_toml.render(config)
             )
 
 
@@ -230,7 +220,10 @@ def main():
 
     config = {
         "command": "docker",
-        "chains": {}
+        "chains": {},
+        "version": {
+            "kujira": os.environ.get("VERSION")
+        }
     }
 
     if args.podman:
@@ -240,6 +233,8 @@ def main():
         Chain("Kujira", "pond-1", "ukuji", args.nodes, 1, args.podman),
         # Chain("Faker", "faker-1", "ufake", 1, 2)
     ]
+
+    print(config)
 
     for chain in chains:
         chain_info = {
@@ -257,6 +252,10 @@ def main():
             chain_info["validators"].append(validator)
 
         config["chains"][chain.chain_id] = chain_info
+
+        print(config)
+
+    print(config)
 
     json.dump(config, open(f"{WORKDIR}/pond.json", "w"))
 
