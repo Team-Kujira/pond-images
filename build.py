@@ -83,8 +83,7 @@ def manifest(command, namespace, app, tag, push=False, extra_tags=[]):
     print(fulltag)
     subprocess.run([
         command, "manifest", "create", f"{fulltag}",
-        # f"{basetag}-arm64", f"{basetag}-x86_64"
-        f"{fulltag}-arm64"
+        f"{fulltag}-arm64", f"{fulltag}-x86_64"
     ])
 
     push_commands.append(
