@@ -49,6 +49,10 @@ def build_arg(s):
 
 def build(command, namespace, app, tag, push=False):
     arch = platform.machine()
+
+    if arch == "x86_64":
+        arch = "amd64"
+
     fulltag = f"{namespace}/{app}:{tag}-{arch}"
 
     cmd = [command, "build", "--tag", fulltag]

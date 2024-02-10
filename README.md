@@ -6,5 +6,5 @@ This repo provides the sources for all images needed to run the local Kujira dev
 
 ```sh
 ./build.py -n teamkujira -a kujira --push
-./build.py --manifest --archs arm64,x86_64
+./build.py --manifest --archs arm64,amd64
 ```
