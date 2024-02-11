@@ -1,0 +1,45 @@
+global:
+    api-listen-addr: :5183
+    timeout: 10s
+    memo: ""
+    light-cache-size: 20
+    log-level: info
+    ics20-memo-limit: 0
+    max-receiver-size: 150
+chains:
+{% for i in [1, 2] %}
+    pond-{{ i }}:
+        type: cosmos
+        value:
+            key-directory: /relayer/keys/pond-{{ i }}
+            key: relayer
+            chain-id: pond-{{ i }}
+            rpc-addr: http://{{ "127.0.0.1" if podman else "kujira%s-1" % i }}:{{ i }}0157
+            account-prefix: kujira
+            keyring-backend: test
+            gas-adjustment: 1.5
+            gas-prices: 0.01ukuji
+            min-gas-amount: 0
+            max-gas-amount: 0
+            debug: false
+            timeout: 20s
+            block-timeout: ""
+            output-format: json
+            sign-mode: direct
+            extra-codecs: []
+            coin-type: 118
+            signing-algorithm: ""
+            broadcast-mode: batch
+            min-loop-duration: 0s
+            extension-options: []
+            feegrants: null
+{% endfor %}
+paths:
+    pond:
+        src:
+            chain-id: pond-1
+        dst:
+            chain-id: pond-2
+        src-channel-filter:
+            rule: ""
+            channel-list: []

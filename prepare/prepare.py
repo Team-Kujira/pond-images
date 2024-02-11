@@ -10,207 +10,77 @@ import argparse
 WORKDIR = "pond"
 
 
-class Chain:
-    name = ""
-    denom = "stake"
+class Node:
+    denom = ""
     chain_id = ""
-    validators = []
-    port_prefix = 1
-    podman = False
-    rpc_port = ""
-    api_port = ""
+    port_prefix = 0
+    home = ""
+    binary = ""
 
-    def __init__(self, name, chain_id, denom, num_validators, port_prefix, podman):
+    def __init__(self, name, chain_id, binary, denom, port_prefix):
         self.name = name
+        self.home = f"{WORKDIR}/{name}"
         self.chain_id = chain_id
-        self.denom = denom
+        self.binary = binary
         self.port_prefix = port_prefix
-        self.podman = podman
+        self.denom = denom
 
-        gentxs = []
-        self.validators = []
-
-        for i in range(1, num_validators + 1):
-            home = f"{WORKDIR}/{name.lower()}{i:02}"
-
-            if os.path.isdir(home):
-                continue
-
-            os.mkdir(home)
-
-            info, gentx = self.prepare_gentxs(chain_id, home)
-            info["rpc_port"] = f"{self.port_prefix}{i:02}57"
-            info["api_port"] = f"{self.port_prefix}{i:02}17"
-            self.validators.append(info)
-
-            gentxs.append(gentx)
-
-        self.prepare_genesis(gentxs)
-        self.prepare_config()
-
-    def prepare_gentxs(self, chain_id, home, amount=10**15):
-        moniker = home.split("/")[-1].title()
-        denom = self.denom
-
-        kujirad = ["kujirad", "--home", home]
-
-        result = subprocess.run(kujirad + [
-            "init", moniker, "--chain-id", chain_id,
-            "--default-denom", self.denom
+    def init(self):
+        result = subprocess.run([
+            self.binary, "--home", self.home, "init", self.name,
+            "--chain-id", self.chain_id, "--default-denom", self.denom
         ], capture_output=True, text=True)
 
         output = json.loads(result.stderr)
-        node_id = output["node_id"]
 
-        kujirad += ["--output", "json"]
+        return output["node_id"]
 
-        result = subprocess.run(kujirad + [
-            "keys", "add", "validator", "--keyring-backend", "test",
-        ], capture_output=True, text=True)
+    def add_key(self, mnemonic, dryrun=False):
+        extra = []
+        if dryrun:
+            extra = ["--dry-run"]
+
+        result = subprocess.run([
+            self.binary, "--output", "json",
+            "--home", self.home, "keys", "add", "validator",
+            "--keyring-backend", "test", "--recover"
+        ] + extra, capture_output=True, text=True, input=mnemonic)
 
         output = json.loads(result.stdout)
         address = output["address"]
-        mnemonic = output["mnemonic"]
 
-        subprocess.run(kujirad + [
-            "genesis", "add-genesis-account", address, f"{amount}{denom}"
+        return address
+
+    def add_genesis_account(self, address, amount):
+        subprocess.run([
+            self.binary, "--output", "json", "--home", self.home, "genesis",
+            "add-genesis-account", address, f"{amount}{self.denom}"
         ])
 
-        staked = amount / 2
-        result = subprocess.run(kujirad + [
-            "genesis", "gentx", "validator", f"{staked}{denom}",
-            "--chain-id", chain_id, "--keyring-backend", "test"
+    def create_gentx(self, amount):
+        subprocess.run([
+            self.binary, "--output", "json", "--home", self.home, "genesis",
+            "gentx", "validator", f"{amount}{self.denom}",
+            "--chain-id", self.chain_id, "--keyring-backend", "test"
         ], capture_output=True, text=True)
 
-        gentx_path = f"{home}/config/gentx"
+        gentx_path = f"{self.home}/config/gentx"
         gentx_file = os.listdir(gentx_path)[0]
         gentx_data = json.load(open(f"{gentx_path}/{gentx_file}", "r"))
+        valoper = gentx_data["body"]["messages"][0]["validator_address"]
 
-        info = {
-            "moniker": moniker,
-            "address": address,
-            "valoper": gentx_data["body"]["messages"][0]["validator_address"],
-            "node_id": node_id,
-            "mnemonic": mnemonic,
-            "amount": amount
-        }
+        return valoper
 
-        return info, gentx_data
-
-    def prepare_genesis(self, gentxs):
-        name = self.name.lower()
-        home = f"{WORKDIR}/{name}01"
-
-        kujirad = ["kujirad", "--home", home]
-
-        for i in range(1, len(self.validators)):
-            info = self.validators[i]
-            address = info["address"]
-            amount = info["amount"]
-            subprocess.run(kujirad + [
-                "genesis", "add-genesis-account", address, f"{amount}{self.denom}"
-            ])
-
-            json.dump(
-                gentxs[i],
-                open(f"{home}/config/gentx/gentx-{info['node_id']}.json", "w")
-            )
-
-        subprocess.run(kujirad + [
-            "genesis", "collect-gentxs"
-        ])
-
-        genesis = json.load(open(f"{home}/config/genesis.json"))
-
-        genesis["app_state"]["crisis"]["constant_fee"]["denom"] = self.denom
-        genesis["app_state"]["denom"]["params"]["creation_fee"][0]["denom"] = self.denom
-        genesis["app_state"]["gov"]["params"]["min_deposit"][0]["denom"] = self.denom
-        genesis["app_state"]["gov"]["params"]["max_deposit_period"] = "20s"
-        genesis["app_state"]["gov"]["params"]["voting_period"] = "20s"
-        genesis["app_state"]["mint"]["minter"]["inflation"] = "0"
-        genesis["app_state"]["mint"]["params"]["mint_denom"] = self.denom
-        if self.denom == "ukuji":
-            genesis["app_state"]["oracle"]["params"]["whitelist"] = [
-                {"name": "BTC"},
-                {"name": "ETH"}
-            ]
-        genesis["app_state"]["staking"]["params"]["unbonding_time"] = "120s"
-        genesis["app_state"]["staking"]["params"]["bond_denom"] = self.denom
-
-        for i in range(len(self.validators)):
-            json.dump(
-                genesis,
-                open(f"{WORKDIR}/{name}{i+1:02}/config/genesis.json", "w"),
-            )
-
-    def prepare_config(self):
-        app_toml = jinja2.Template(
-            open("templates/app.toml.j2", "r").read()
-        )
-        config_toml = jinja2.Template(
-            open("templates/config.toml.j2", "r").read()
-        )
-        feeder_toml = jinja2.Template(
-            open("templates/feeder.toml.j2", "r").read()
-        )
-
-        for index, info in enumerate(self.validators):
-            num = f"{index+1:02}"
-            home = f"{WORKDIR}/{self.name.lower()}{num}"
-
-            node_id = info["node_id"]
-
-            persistent_peers = []
-            for i, v in enumerate(self.validators):
-                if v["node_id"] == node_id:
-                    continue
-                port = f"{self.port_prefix}{i+1:02}{56}"
-                host = v["moniker"].lower()
-                if self.podman:
-                    host = "127.0.0.1"
-                persistent_peers.append(f"{v['node_id']}@{host}:{port}")
-
-            config = {
-                "api_port": f"{self.port_prefix}{num}{17}",
-                "grpc_port": f"{self.port_prefix}{num}{90}",
-                "app_port": f"{self.port_prefix}{num}{56}",
-                "rpc_port": f"{self.port_prefix}{num}{57}",
-                "abci_port": f"{self.port_prefix}{num}{58}",
-                "pprof_port": f"{self.port_prefix}{num}{60}",
-                "feeder_port": f"{self.port_prefix}{num}{71}",
-                "persistent_peers": ",".join(persistent_peers),
-                "moniker": info["moniker"],
-                "address": info["address"],
-                "valoper": info["valoper"],
-                "chain_id": self.chain_id,
-                "podman": self.podman
-            }
-
-            open(f"{home}/config/app.toml", "w").write(
-                app_toml.render(config)
-            )
-
-            open(f"{home}/config/config.toml", "w").write(
-                config_toml.render(config)
-            )
-
-            if self.denom != "ukuji":
-                continue
-
-            home = f"{WORKDIR}/feeder{num}"
-            if os.path.isdir(home):
-                continue
-
-            os.mkdir(home)
-
-            open(f"{home}/config.toml", "w").write(
-                feeder_toml.render(config)
-            )
+    def collectd_gentxs(self):
+        subprocess.run([
+            self.binary, "--home", self.home, "genesis", "collect-gentxs"
+        ], capture_output=False, text=True)
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-n", "--nodes", type=int, default=1,
+                        choices=range(1, 9), metavar="[1-9]",
                         help="Set number of validator nodes")
     parser.add_argument("--clear", action="store_true",
                         help="Remove all configs and create new chain")
@@ -218,6 +88,207 @@ def parse_args():
                         help="Generate start/stop scripts for podman")
 
     return parser.parse_args()
+
+
+def get_persistent_peers(validators, node_id, podman):
+    persistent_peers = []
+    for validator in validators:
+        if validator["node_id"] == node_id:
+            continue
+
+        port = validator["app_port"]
+        host = validator["moniker"].lower()
+        peer = validator["node_id"]
+        if podman:
+            host = "127.0.0.1"
+        persistent_peers.append(f"{peer}@{host}:{port}")
+
+    return persistent_peers
+
+
+def init_chain(name, chain_id, binary, denom, nodes, port_prefix, mnemonics, podman):
+    info = {
+        "validators": [],
+        "accounts": []
+    }
+
+    total = 0
+
+    main = Node(f"{name}1", id, binary, denom, port_prefix)
+
+    for i in range(nodes):
+        moniker = f"{name}{i+1}"
+        mnemonic = mnemonics["validators"][i]
+
+        amount = 300_000_000_000
+        staked = 200_000_000_000
+
+        total += amount
+
+        node = Node(moniker, chain_id, binary, denom, port_prefix)
+        node_id = node.init()
+        address = node.add_key(mnemonic)
+        node.add_genesis_account(address, amount)
+        valoper = node.create_gentx(staked)
+
+        # add account to "main" node
+        if i > 0:
+            main.add_genesis_account(address, amount)
+
+        info["validators"].append({
+            "moniker": moniker,
+            "address": address,
+            "valoper": valoper,
+            "node_id": node_id,
+            "mnemonic": mnemonic,
+            "api_port": f"{port_prefix}{i+1:02}17",
+            "app_port": f"{port_prefix}{i+1:02}56",
+            "rpc_port": f"{port_prefix}{i+1:02}57"
+        })
+
+        if i == 0:
+            continue
+
+        gentx_path = f"{WORKDIR}/{moniker}/config/gentx"
+        gentx_file = os.listdir(gentx_path)[0]
+
+        shutil.copyfile(
+            f"{gentx_path}/{gentx_file}",
+            f"{WORKDIR}/{name}1/config/gentx/{gentx_file}"
+        )
+
+    for i in range(0, len(mnemonics.get("accounts", []))):
+        mnemonic = mnemonics["accounts"][i]
+
+        amount = 10_000_000_000_000
+        total += amount
+
+        address = node.add_key(mnemonic, True)
+        node.add_genesis_account(address, amount)
+
+        info["accounts"].append({
+            "address": address,
+            "mnemonic": mnemonic
+        })
+
+    # add ibc account
+
+    mnemonic = mnemonics["relayer"]
+
+    amount = 1_000_000_000_000
+    total += amount
+
+    address = node.add_key(mnemonic, True)
+    node.add_genesis_account(address, amount)
+
+    info["ibc"] = {
+        "address": address,
+        "mnemonic": mnemonic
+    }
+
+    node.collectd_gentxs()
+
+    genesis = json.load(open(f"{node.home}/config/genesis.json"))
+
+    genesis["app_state"]["crisis"]["constant_fee"]["denom"] = denom
+    genesis["app_state"]["denom"]["params"]["creation_fee"][0]["denom"] = denom
+    genesis["app_state"]["gov"]["params"]["min_deposit"][0]["denom"] = denom
+    genesis["app_state"]["gov"]["params"]["max_deposit_period"] = "20s"
+    genesis["app_state"]["gov"]["params"]["voting_period"] = "20s"
+    genesis["app_state"]["mint"]["minter"]["inflation"] = "0"
+    genesis["app_state"]["mint"]["params"]["mint_denom"] = denom
+    genesis["app_state"]["staking"]["params"]["unbonding_time"] = "1209600s"
+    genesis["app_state"]["staking"]["params"]["bond_denom"] = denom
+
+    if chain_id == "pond-1":
+        genesis["app_state"]["oracle"]["params"]["whitelist"] = [
+            {"name": "BTC"},
+            {"name": "ETH"}
+        ]
+
+    for i in range(nodes):
+        filename = f"{WORKDIR}/{name}{i+1}/config/genesis.json"
+        json.dump(genesis, open(filename, "w"))
+
+    app_toml = jinja2.Template(
+        open("templates/app.toml.j2", "r").read()
+    )
+    config_toml = jinja2.Template(
+        open("templates/config.toml.j2", "r").read()
+    )
+    client_toml = jinja2.Template(
+        open("templates/client.toml.j2", "r").read()
+    )
+    feeder_toml = jinja2.Template(
+        open("templates/feeder.toml.j2", "r").read()
+    )
+
+    for i, validator in enumerate(info["validators"]):
+        # validator nodes
+
+        home = f"{WORKDIR}/{name}{i+1}"
+
+        node_id = validator["node_id"]
+
+        persistent_peers = get_persistent_peers(
+            info["validators"], node_id, podman
+        )
+
+        config = {
+            "api_port": f"{port_prefix}0{i+1}{17}",
+            "grpc_port": f"{port_prefix}0{i+1}{90}",
+            "app_port": f"{port_prefix}0{i+1}{56}",
+            "rpc_port": f"{port_prefix}0{i+1}{57}",
+            "abci_port": f"{port_prefix}0{i+1}{58}",
+            "pprof_port": f"{port_prefix}0{i+1}{60}",
+            "feeder_port": f"{port_prefix}0{i+1}{71}",
+            "persistent_peers": ",".join(persistent_peers),
+            "moniker": validator["moniker"],
+            "address": validator["address"],
+            "valoper": validator["valoper"],
+            "chain_id": chain_id,
+            "podman": podman
+        }
+
+        open(f"{home}/config/app.toml", "w").write(
+            app_toml.render(config)
+        )
+
+        open(f"{home}/config/config.toml", "w").write(
+            config_toml.render(config)
+        )
+
+        open(f"{home}/config/client.toml", "w").write(
+            client_toml.render(config)
+        )
+
+        # feeders
+        if chain_id != "pond-1":
+            continue
+
+        home = f"{WORKDIR}/feeder1-{i+1}"
+
+        if not os.path.isdir(home):
+            os.mkdir(home)
+
+        open(f"{home}/config.toml", "w").write(
+            feeder_toml.render(config)
+        )
+
+    # fix info
+
+    for i in range(nodes):
+        validator = info["validators"][i]
+
+        validator["rpc_url"] = f"http://localhost:{validator['rpc_port']}"
+        validator["api_url"] = f"http://localhost:{validator['api_port']}"
+        validator.pop("app_port")
+        validator.pop("api_port")
+        validator.pop("rpc_port")
+
+        info["validators"][i] = validator
+
+    return info
 
 
 def main():
@@ -229,51 +300,55 @@ def main():
     if not os.path.isdir(WORKDIR):
         os.mkdir(WORKDIR)
 
-    chains = [
-        Chain("Kujira", "pond-1", "ukuji", args.nodes, 1, args.podman),
-        # Chain("Faker", "faker-1", "ufake", 1, 2)
-    ]
-
-    start = jinja2.Template(open("templates/start.sh.j2", "r").read())
-    open(f"{WORKDIR}/start.sh", "w").write(
-        start.render({
-            "podman": args.podman,
-            "chains": chains
-        })
-    )
-
-    stop = jinja2.Template(open("templates/stop.sh.j2", "r").read())
-    open(f"{WORKDIR}/stop.sh", "w").write(
-        stop.render({
-            "podman": args.podman,
-            "chains": chains
-        })
-    )
-
-    info = {
-        "chains": {}
-    }
-    for chain in chains:
-        chain_info = {
-            "name": chain.name,
-            "validators": []
+    config = {
+        "command": "docker",
+        "wallets": {},
+        "validators": {},
+        "version": {
+            "kujira": os.environ.get("KUJIRA_VERSION"),
+            "feeder": os.environ.get("FEEDER_VERSION"),
+            "relayer": os.environ.get("RELAYER_VERSION")
         }
+    }
 
-        for validator in chain.validators:
-            validator["rpc_url"] = f"http://localhost:{validator['rpc_port']}"
-            validator["api_url"] = f"http://localhost:{validator['api_port']}"
-            validator.pop("rpc_port")
-            validator.pop("api_port")
-            validator.pop("amount")
+    if args.podman:
+        config["command"] = "podman"
 
-            chain_info["validators"].append(validator)
+    mnemonics = json.load(open("mnemonics.json", "r"))
 
-        info["chains"][chain.chain_id] = chain_info
+    info1 = init_chain(
+        "kujira1-", "pond-1", "kujirad", "ukuji",
+        args.nodes, 1, mnemonics, args.podman
+    )
 
-    json.dump(info, open(f"{WORKDIR}/info.json", "w"))
+    info2 = init_chain(
+        "kujira2-", "pond-2", "kujirad", "ukuji", 1, 2, mnemonics, args.podman
+    )
 
-    os.chmod(f"{WORKDIR}/start.sh", 0o755)
-    os.chmod(f"{WORKDIR}/stop.sh", 0o755)
+    config["validators"] = {
+        "pond-1": info1["validators"],
+        "pond-2": info2["validators"]
+    }
+
+    config["wallets"] = info1["accounts"]
+    config["ibc"] = info1["ibc"]
+
+    # init relayer
+
+    home = f"{WORKDIR}/relayer"
+    os.makedirs(f"{home}/config", exist_ok=True)
+
+    relayer_yaml = jinja2.Template(
+        open("templates/relayer.yaml.j2", "r").read()
+    )
+
+    open(f"{home}/config/config.yaml", "w").write(
+        relayer_yaml.render({"podman": args.podman})
+    )
+
+    shutil.copytree("keys", f"{home}/keys", dirs_exist_ok=True)
+
+    json.dump(config, open(f"{WORKDIR}/pond.json", "w"))
 
 
 if __name__ == "__main__":
