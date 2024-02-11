@@ -200,7 +200,7 @@ def init_chain(name, chain_id, binary, denom, nodes, port_prefix, mnemonics, pod
     genesis["app_state"]["staking"]["params"]["unbonding_time"] = "1209600s"
     genesis["app_state"]["staking"]["params"]["bond_denom"] = denom
 
-    if name == "kujira-1":
+    if chain_id == "pond-1":
         genesis["app_state"]["oracle"]["params"]["whitelist"] = [
             {"name": "BTC"},
             {"name": "ETH"}
@@ -263,7 +263,7 @@ def init_chain(name, chain_id, binary, denom, nodes, port_prefix, mnemonics, pod
         )
 
         # feeders
-        if chain_id != "kujira-1":
+        if chain_id != "pond-1":
             continue
 
         home = f"{WORKDIR}/feeder1-{i+1}"
@@ -317,17 +317,17 @@ def main():
     mnemonics = json.load(open("mnemonics.json", "r"))
 
     info1 = init_chain(
-        "kujira1-", "kujira-1", "kujirad", "ukuji",
+        "kujira1-", "pond-1", "kujirad", "ukuji",
         args.nodes, 1, mnemonics, args.podman
     )
 
     info2 = init_chain(
-        "kujira2-", "kujira-2", "kujirad", "ukuji", 1, 2, mnemonics, args.podman
+        "kujira2-", "pond-2", "kujirad", "ukuji", 1, 2, mnemonics, args.podman
     )
 
     config["validators"] = {
-        "kujira-1": info1["validators"],
-        "kujira-2": info2["validators"]
+        "pond-1": info1["validators"],
+        "pond-2": info2["validators"]
     }
 
     config["wallets"] = info1["accounts"]

@@ -8,12 +8,12 @@ global:
     max-receiver-size: 150
 chains:
 {% for i in [1, 2] %}
-    kujira-{{ i }}:
+    pond-{{ i }}:
         type: cosmos
         value:
-            key-directory: /relayer/keys/kujira-{{ i }}
+            key-directory: /relayer/keys/pond-{{ i }}
             key: relayer
-            chain-id: kujira-{{ i }}
+            chain-id: pond-{{ i }}
             rpc-addr: http://{{ "127.0.0.1" if podman else "kujira%s-1" % i }}:{{ i }}0157
             account-prefix: kujira
             keyring-backend: test
@@ -37,9 +37,9 @@ chains:
 paths:
     pond:
         src:
-            chain-id: kujira-1
+            chain-id: pond-1
         dst:
-            chain-id: kujira-2
+            chain-id: pond-2
         src-channel-filter:
             rule: ""
             channel-list: []
