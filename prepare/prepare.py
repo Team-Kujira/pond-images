@@ -71,7 +71,7 @@ class Node:
 
         return valoper
 
-    def collectd_gentxs(self):
+    def collect_gentxs(self):
         subprocess.run([
             self.binary, "--home", self.home, "genesis", "collect-gentxs"
         ], capture_output=False, text=True)
@@ -143,7 +143,8 @@ def init_chain(name, chain_id, binary, denom, nodes, port_prefix, mnemonics, pod
             "mnemonic": mnemonic,
             "api_port": f"{port_prefix}{i+1:02}17",
             "app_port": f"{port_prefix}{i+1:02}56",
-            "rpc_port": f"{port_prefix}{i+1:02}57"
+            "rpc_port": f"{port_prefix}{i+1:02}57",
+            "feeder_url": f"http://localhost:10{i+1}71/api/v1/prices"
         })
 
         if i == 0:
@@ -163,8 +164,8 @@ def init_chain(name, chain_id, binary, denom, nodes, port_prefix, mnemonics, pod
         amount = 10_000_000_000_000
         total += amount
 
-        address = node.add_key(mnemonic, True)
-        node.add_genesis_account(address, amount)
+        address = main.add_key(mnemonic, True)
+        main.add_genesis_account(address, amount)
 
         info["accounts"].append({
             "address": address,
@@ -178,17 +179,17 @@ def init_chain(name, chain_id, binary, denom, nodes, port_prefix, mnemonics, pod
     amount = 1_000_000_000_000
     total += amount
 
-    address = node.add_key(mnemonic, True)
-    node.add_genesis_account(address, amount)
+    address = main.add_key(mnemonic, True)
+    main.add_genesis_account(address, amount)
 
     info["ibc"] = {
         "address": address,
         "mnemonic": mnemonic
     }
 
-    node.collectd_gentxs()
+    main.collect_gentxs()
 
-    genesis = json.load(open(f"{node.home}/config/genesis.json"))
+    genesis = json.load(open(f"{main.home}/config/genesis.json"))
 
     genesis["app_state"]["crisis"]["constant_fee"]["denom"] = denom
     genesis["app_state"]["denom"]["params"]["creation_fee"][0]["denom"] = denom
@@ -199,6 +200,7 @@ def init_chain(name, chain_id, binary, denom, nodes, port_prefix, mnemonics, pod
     genesis["app_state"]["mint"]["params"]["mint_denom"] = denom
     genesis["app_state"]["staking"]["params"]["unbonding_time"] = "1209600s"
     genesis["app_state"]["staking"]["params"]["bond_denom"] = denom
+    genesis["consensus"]["params"]["abci"]["vote_extensions_enable_height"] = "1"
 
     if chain_id == "pond-1":
         genesis["app_state"]["oracle"]["params"]["whitelist"] = [
@@ -247,6 +249,7 @@ def init_chain(name, chain_id, binary, denom, nodes, port_prefix, mnemonics, pod
             "address": validator["address"],
             "valoper": validator["valoper"],
             "chain_id": chain_id,
+            "node_num": i+1,
             "podman": podman
         }
 
@@ -280,11 +283,14 @@ def init_chain(name, chain_id, binary, denom, nodes, port_prefix, mnemonics, pod
     for i in range(nodes):
         validator = info["validators"][i]
 
-        validator["rpc_url"] = f"http://localhost:{validator['rpc_port']}"
         validator["api_url"] = f"http://localhost:{validator['api_port']}"
+        validator["app_url"] = f"tcp://localhost:{validator['app_port']}"
+        validator["rpc_url"] = f"http://localhost:{validator['rpc_port']}"
         validator.pop("app_port")
         validator.pop("api_port")
         validator.pop("rpc_port")
+        if chain_id != "pond-1":
+            validator.pop("feeder_url")
 
         info["validators"][i] = validator
 

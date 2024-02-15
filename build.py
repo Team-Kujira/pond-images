@@ -4,42 +4,18 @@ import argparse
 import platform
 import subprocess
 import sys
-
-GO_VERSIONS = {
-    "kujira": {
-        "v0.9.0":  "1.20.2",
-        "v0.9.1":  "1.20.2",
-        "v0.9.2":  "1.20.2",
-        "v0.9.3-1":  "1.20.2",
-        "sdk-50":  "1.21.3",
-    },
-    "feeder": {
-        "v0.8.3": "1.20.2",
-        "v0.11.0": "1.20.2",
-    },
-    "relayer": {
-        "v2.5.0": "1.21.7",
-    }
-}
-
-VERSIONS = {
-    "v0.1.0": {
-        "kujira": "v0.9.3-1",
-        "feeder": "v0.11.0",
-        "relayer": "v2.5.0"
-    }
-}
+import yaml
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-n", "--namespace", default="teamkujira")
     parser.add_argument("-a", "--app")
-    parser.add_argument("-t", "--tag", default="v0.1.0")
+    parser.add_argument("-t", "--tag", required=True)
     parser.add_argument("--push", action="store_true")
     parser.add_argument("--podman", action="store_true")
     parser.add_argument("--manifest", action="store_true")
-    parser.add_argument("--archs", default=platform.machine())
+    parser.add_argument("--archs")
     return parser.parse_args()
 
 
@@ -47,7 +23,7 @@ def build_arg(s):
     return ["--build-arg", s]
 
 
-def build(command, namespace, app, tag, push=False):
+def build(command, namespace, app, tag, versions, push=False):
     arch = platform.machine()
 
     if arch == "x86_64":
@@ -58,7 +34,7 @@ def build(command, namespace, app, tag, push=False):
     cmd = [command, "build", "--tag", fulltag]
 
     if app in ["feeder", "kujira", "relayer"]:
-        go_version = GO_VERSIONS.get(app, {}).get(tag)
+        go_version = versions["go"].get(app, {}).get(tag)
         if not go_version:
             print(f"no go version defined for {app}:{tag}")
             sys.exit(1)
@@ -67,9 +43,9 @@ def build(command, namespace, app, tag, push=False):
         cmd += build_arg(f"go_version={go_version}")
 
     if app == "prepare":
-        kujira_version = VERSIONS[tag]["kujira"]
-        feeder_version = VERSIONS[tag]["feeder"]
-        relayer_version = VERSIONS[tag]["relayer"]
+        kujira_version = versions["pond"][tag]["kujira"]
+        feeder_version = versions["pond"][tag]["feeder"]
+        relayer_version = versions["pond"][tag]["relayer"]
 
         cmd += build_arg(f"kujira_version={kujira_version}")
         cmd += build_arg(f"feeder_version={feeder_version}")
@@ -115,6 +91,8 @@ def manifest(command, namespace, app, tag, archs, push=False):
 def main():
     args = parse_args()
 
+    versions = yaml.safe_load(open("versions.yml", "r"))
+
     command = "docker"
     if args.podman:
         command = "podman"
@@ -124,7 +102,7 @@ def main():
         apps = [args.app]
 
     for app in apps:
-        tag = VERSIONS[args.tag].get(app)
+        tag = versions["pond"][args.tag].get(app)
         if app == "prepare":
             tag = args.tag
 
@@ -132,12 +110,18 @@ def main():
             print(f"no tag defined for {app} ({args.tag})")
             sys.exit(1)
 
-        build(command, args.namespace, app, tag, args.push)
+        build(command, args.namespace, app, tag, versions, args.push)
 
         if not args.manifest:
             return
 
-        manifest(command, args.namespace, app, tag, args.archs, args.push)
+        if not args.archs:
+            archs = platform.machine()
+
+            if archs == "x86_64":
+                archs = "amd64"
+
+        manifest(command, args.namespace, app, tag, archs, args.push)
 
 
 if __name__ == "__main__":

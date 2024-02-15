@@ -1,0 +1,19 @@
+pond:
+  v0.1.0:
+    kujira: v0.9.3-1
+    feeder: v0.11.0
+    relayer: v2.5.0
+  oracle:
+    kujira: 0fa65a9
+    feeder: api-only
+    relayer: v2.5.0
+
+go:
+  kujira:
+    v0.9.3-1:  1.20.2
+    0fa65a9:  1.21.3
+  feeder:
+    v0.11.0: 1.20.2
+    api-only: 1.21.3
+  relayer:
+    v2.5.0: 1.21.7

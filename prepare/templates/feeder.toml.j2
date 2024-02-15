@@ -1,35 +1,10 @@
-gas_adjustment = 1.7
-gas_prices = "0.00125ukuji"
-enable_server = true
-enable_voter = true
-
-history_db = "/root/feeder.db"
+history_db = "/feeder/feeder.db"
 
 [server]
-listen_addr = "localhost:{{ feeder_port }}"
+listen_addr = "0.0.0.0:{{ feeder_port }}"
 read_timeout = "20s"
 verbose_cors = true
 write_timeout = "20s"
-
-[rpc]
-rpc_timeout = "100ms"
-{% if podman %}
-grpc_endpoint = "127.0.0.1:{{ grpc_port }}"
-tmrpc_endpoint = "http://127.0.0.1:{{ rpc_port }}"
-{% else %}
-grpc_endpoint = "{{ moniker | lower }}:{{ grpc_port }}"
-tmrpc_endpoint = "http://{{ moniker | lower }}:{{ rpc_port }}"
-{% endif %}
-
-[account]
-address = "{{ address }}"
-chain_id = "{{ chain_id }}"
-validator = "{{ valoper }}"
-prefix = "kujira"
-
-[keyring]
-backend = "memory"
-dir = "/root"
 
 [[deviation_thresholds]]
 base = "USDT"
