@@ -115,7 +115,8 @@ def main():
         if not args.manifest:
             return
 
-        if not args.archs:
+        archs = args.archs
+        if not archs:
             archs = platform.machine()
 
             if archs == "x86_64":
