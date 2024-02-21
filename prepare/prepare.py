@@ -35,14 +35,14 @@ class Node:
 
         return output["node_id"]
 
-    def add_key(self, mnemonic, dryrun=False):
+    def add_key(self, name, mnemonic, dryrun=False):
         extra = []
         if dryrun:
             extra = ["--dry-run"]
 
         result = subprocess.run([
             self.binary, "--output", "json",
-            "--home", self.home, "keys", "add", "validator",
+            "--home", self.home, "keys", "add", name,
             "--keyring-backend", "test", "--recover"
         ] + extra, capture_output=True, text=True, input=mnemonic)
 
@@ -106,18 +106,18 @@ def get_persistent_peers(validators, node_id, podman):
     return persistent_peers
 
 
-def init_chain(name, chain_id, binary, denom, nodes, port_prefix, mnemonics, podman):
+def init_chain(prefix, chain_id, binary, denom, nodes, port_prefix, mnemonics, podman):
     info = {
         "validators": [],
-        "accounts": []
+        "accounts": {}
     }
 
     total = 0
 
-    main = Node(f"{name}1", id, binary, denom, port_prefix)
+    main = Node(f"{prefix}1", id, binary, denom, port_prefix)
 
     for i in range(nodes):
-        moniker = f"{name}{i+1}"
+        moniker = f"{prefix}{i+1}"
         mnemonic = mnemonics["validators"][i]
 
         amount = 300_000_000_000
@@ -127,7 +127,7 @@ def init_chain(name, chain_id, binary, denom, nodes, port_prefix, mnemonics, pod
 
         node = Node(moniker, chain_id, binary, denom, port_prefix)
         node_id = node.init()
-        address = node.add_key(mnemonic)
+        address = node.add_key("validator", mnemonic)
         node.add_genesis_account(address, amount)
         valoper = node.create_gentx(staked)
 
@@ -155,37 +155,38 @@ def init_chain(name, chain_id, binary, denom, nodes, port_prefix, mnemonics, pod
 
         shutil.copyfile(
             f"{gentx_path}/{gentx_file}",
-            f"{WORKDIR}/{name}1/config/gentx/{gentx_file}"
+            f"{WORKDIR}/{prefix}1/config/gentx/{gentx_file}"
         )
 
     for i in range(0, len(mnemonics.get("accounts", []))):
+        name = f"test{i}"
         mnemonic = mnemonics["accounts"][i]
 
         amount = 10_000_000_000_000
         total += amount
 
-        address = main.add_key(mnemonic, True)
+        address = main.add_key(name, mnemonic)
         main.add_genesis_account(address, amount)
 
-        info["accounts"].append({
+        info["accounts"][name] = {
             "address": address,
             "mnemonic": mnemonic
-        })
+        }
 
-    # add ibc account
+    # add special accounts
+    for name in ["relayer", "deployer"]:
+        mnemonic = mnemonics[name]
 
-    mnemonic = mnemonics["relayer"]
+        amount = 1_000_000_000_000
+        total += amount
 
-    amount = 1_000_000_000_000
-    total += amount
+        address = main.add_key(name, mnemonic)
+        main.add_genesis_account(address, amount)
 
-    address = main.add_key(mnemonic, True)
-    main.add_genesis_account(address, amount)
-
-    info["ibc"] = {
-        "address": address,
-        "mnemonic": mnemonic
-    }
+        info["accounts"][name] = {
+            "address": address,
+            "mnemonic": mnemonic
+        }
 
     main.collect_gentxs()
 
@@ -209,7 +210,7 @@ def init_chain(name, chain_id, binary, denom, nodes, port_prefix, mnemonics, pod
         ]
 
     for i in range(nodes):
-        filename = f"{WORKDIR}/{name}{i+1}/config/genesis.json"
+        filename = f"{WORKDIR}/{prefix}{i+1}/config/genesis.json"
         json.dump(genesis, open(filename, "w"))
 
     app_toml = jinja2.Template(
@@ -228,7 +229,7 @@ def init_chain(name, chain_id, binary, denom, nodes, port_prefix, mnemonics, pod
     for i, validator in enumerate(info["validators"]):
         # validator nodes
 
-        home = f"{WORKDIR}/{name}{i+1}"
+        home = f"{WORKDIR}/{prefix}{i+1}"
 
         node_id = validator["node_id"]
 
@@ -336,8 +337,7 @@ def main():
         "pond-2": info2["validators"]
     }
 
-    config["wallets"] = info1["accounts"]
-    config["ibc"] = info1["ibc"]
+    config["accounts"] = info1["accounts"]
 
     # init relayer
 
