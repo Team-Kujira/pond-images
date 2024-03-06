@@ -4,8 +4,9 @@ FROM golang:${go_version} AS build
 ARG relayer_version
 
 WORKDIR /build
-RUN git clone --depth 1 --branch ${relayer_version} https://github.com/cosmos/relayer.git && \
+RUN git clone https://github.com/cosmos/relayer.git && \
     cd relayer && \
+    git checkout ${relayer_version} && \
     make install
 
 WORKDIR /dist

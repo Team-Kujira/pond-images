@@ -26,12 +26,12 @@ class Node:
         self.denom = denom
 
     def init(self):
-        result = subprocess.run([
+        result = subprocess.check_output([
             self.binary, "--home", self.home, "init", self.name,
             "--chain-id", self.chain_id, "--default-denom", self.denom
-        ], capture_output=True, text=True)
+        ], stderr=subprocess.STDOUT)
 
-        output = json.loads(result.stderr)
+        output = json.loads(result)
 
         return output["node_id"]
 
@@ -58,11 +58,11 @@ class Node:
         ])
 
     def create_gentx(self, amount):
-        subprocess.run([
+        subprocess.check_call([
             self.binary, "--output", "json", "--home", self.home, "genesis",
             "gentx", "validator", f"{amount}{self.denom}",
             "--chain-id", self.chain_id, "--keyring-backend", "test"
-        ], capture_output=True, text=True)
+        ], stderr=subprocess.DEVNULL)
 
         gentx_path = f"{self.home}/config/gentx"
         gentx_file = os.listdir(gentx_path)[0]
@@ -72,9 +72,9 @@ class Node:
         return valoper
 
     def collect_gentxs(self):
-        subprocess.run([
+        subprocess.check_output([
             self.binary, "--home", self.home, "genesis", "collect-gentxs"
-        ], capture_output=False, text=True)
+        ], stderr=subprocess.DEVNULL)
 
 
 def parse_args():
@@ -114,7 +114,7 @@ def init_chain(prefix, chain_id, binary, denom, nodes, port_prefix, mnemonics, p
 
     total = 0
 
-    main = Node(f"{prefix}1", id, binary, denom, port_prefix)
+    main = Node(f"{prefix}1", chain_id, binary, denom, port_prefix)
 
     for i in range(nodes):
         moniker = f"{prefix}{i+1}"
@@ -314,7 +314,8 @@ def main():
         "version": {
             "kujira": os.environ.get("KUJIRA_VERSION"),
             "feeder": os.environ.get("FEEDER_VERSION"),
-            "relayer": os.environ.get("RELAYER_VERSION")
+            "relayer": os.environ.get("RELAYER_VERSION"),
+            "prepare": os.environ.get("PREPARE_VERSION")
         }
     }
 
