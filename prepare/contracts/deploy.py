@@ -80,7 +80,7 @@ class Deployer:
 
         result = subprocess.run(command, capture_output=True, text=True)
 
-        address = result.stdout
+        address = result.stdout.strip()
         if not address:
             error("couldn't get address", wallet=self.wallet)
 
@@ -335,6 +335,7 @@ class Deployer:
         }
 
         rendered = template.render(**params)
+
         contract = Contract(json.loads(rendered))
 
         # generate address
