@@ -26,23 +26,23 @@ class Node:
         self.denom = denom
 
     def init(self):
-        result = subprocess.run([
+        result = subprocess.check_output([
             self.binary, "--home", self.home, "init", self.name,
             "--chain-id", self.chain_id, "--default-denom", self.denom
-        ], capture_output=True, text=True)
+        ], stderr=subprocess.STDOUT)
 
-        output = json.loads(result.stderr)
+        output = json.loads(result)
 
         return output["node_id"]
 
-    def add_key(self, mnemonic, dryrun=False):
+    def add_key(self, name, mnemonic, dryrun=False):
         extra = []
         if dryrun:
             extra = ["--dry-run"]
 
         result = subprocess.run([
             self.binary, "--output", "json",
-            "--home", self.home, "keys", "add", "validator",
+            "--home", self.home, "keys", "add", name,
             "--keyring-backend", "test", "--recover"
         ] + extra, capture_output=True, text=True, input=mnemonic)
 
@@ -58,11 +58,11 @@ class Node:
         ])
 
     def create_gentx(self, amount):
-        subprocess.run([
+        subprocess.check_call([
             self.binary, "--output", "json", "--home", self.home, "genesis",
             "gentx", "validator", f"{amount}{self.denom}",
             "--chain-id", self.chain_id, "--keyring-backend", "test"
-        ], capture_output=True, text=True)
+        ], stderr=subprocess.DEVNULL)
 
         gentx_path = f"{self.home}/config/gentx"
         gentx_file = os.listdir(gentx_path)[0]
@@ -71,10 +71,10 @@ class Node:
 
         return valoper
 
-    def collectd_gentxs(self):
-        subprocess.run([
+    def collect_gentxs(self):
+        subprocess.check_output([
             self.binary, "--home", self.home, "genesis", "collect-gentxs"
-        ], capture_output=False, text=True)
+        ], stderr=subprocess.DEVNULL)
 
 
 def parse_args():
@@ -106,18 +106,18 @@ def get_persistent_peers(validators, node_id, podman):
     return persistent_peers
 
 
-def init_chain(name, chain_id, binary, denom, nodes, port_prefix, mnemonics, podman):
+def init_chain(prefix, chain_id, binary, denom, nodes, port_prefix, mnemonics, podman):
     info = {
         "validators": [],
-        "accounts": []
+        "accounts": {}
     }
 
     total = 0
 
-    main = Node(f"{name}1", id, binary, denom, port_prefix)
+    main = Node(f"{prefix}1", chain_id, binary, denom, port_prefix)
 
     for i in range(nodes):
-        moniker = f"{name}{i+1}"
+        moniker = f"{prefix}{i+1}"
         mnemonic = mnemonics["validators"][i]
 
         amount = 300_000_000_000
@@ -127,7 +127,7 @@ def init_chain(name, chain_id, binary, denom, nodes, port_prefix, mnemonics, pod
 
         node = Node(moniker, chain_id, binary, denom, port_prefix)
         node_id = node.init()
-        address = node.add_key(mnemonic)
+        address = node.add_key("validator", mnemonic)
         node.add_genesis_account(address, amount)
         valoper = node.create_gentx(staked)
 
@@ -143,7 +143,8 @@ def init_chain(name, chain_id, binary, denom, nodes, port_prefix, mnemonics, pod
             "mnemonic": mnemonic,
             "api_port": f"{port_prefix}{i+1:02}17",
             "app_port": f"{port_prefix}{i+1:02}56",
-            "rpc_port": f"{port_prefix}{i+1:02}57"
+            "rpc_port": f"{port_prefix}{i+1:02}57",
+            "feeder_url": f"http://localhost:10{i+1}71/api/v1/prices"
         })
 
         if i == 0:
@@ -154,41 +155,42 @@ def init_chain(name, chain_id, binary, denom, nodes, port_prefix, mnemonics, pod
 
         shutil.copyfile(
             f"{gentx_path}/{gentx_file}",
-            f"{WORKDIR}/{name}1/config/gentx/{gentx_file}"
+            f"{WORKDIR}/{prefix}1/config/gentx/{gentx_file}"
         )
 
     for i in range(0, len(mnemonics.get("accounts", []))):
+        name = f"test{i}"
         mnemonic = mnemonics["accounts"][i]
 
         amount = 10_000_000_000_000
         total += amount
 
-        address = node.add_key(mnemonic, True)
-        node.add_genesis_account(address, amount)
+        address = main.add_key(name, mnemonic)
+        main.add_genesis_account(address, amount)
 
-        info["accounts"].append({
+        info["accounts"][name] = {
             "address": address,
             "mnemonic": mnemonic
-        })
+        }
 
-    # add ibc account
+    # add special accounts
+    for name in ["relayer", "deployer"]:
+        mnemonic = mnemonics[name]
 
-    mnemonic = mnemonics["relayer"]
+        amount = 1_000_000_000_000
+        total += amount
 
-    amount = 1_000_000_000_000
-    total += amount
+        address = main.add_key(name, mnemonic)
+        main.add_genesis_account(address, amount)
 
-    address = node.add_key(mnemonic, True)
-    node.add_genesis_account(address, amount)
+        info["accounts"][name] = {
+            "address": address,
+            "mnemonic": mnemonic
+        }
 
-    info["ibc"] = {
-        "address": address,
-        "mnemonic": mnemonic
-    }
+    main.collect_gentxs()
 
-    node.collectd_gentxs()
-
-    genesis = json.load(open(f"{node.home}/config/genesis.json"))
+    genesis = json.load(open(f"{main.home}/config/genesis.json"))
 
     genesis["app_state"]["crisis"]["constant_fee"]["denom"] = denom
     genesis["app_state"]["denom"]["params"]["creation_fee"][0]["denom"] = denom
@@ -199,6 +201,7 @@ def init_chain(name, chain_id, binary, denom, nodes, port_prefix, mnemonics, pod
     genesis["app_state"]["mint"]["params"]["mint_denom"] = denom
     genesis["app_state"]["staking"]["params"]["unbonding_time"] = "1209600s"
     genesis["app_state"]["staking"]["params"]["bond_denom"] = denom
+    genesis["consensus"]["params"]["abci"]["vote_extensions_enable_height"] = "1"
 
     if chain_id == "pond-1":
         genesis["app_state"]["oracle"]["params"]["whitelist"] = [
@@ -207,7 +210,7 @@ def init_chain(name, chain_id, binary, denom, nodes, port_prefix, mnemonics, pod
         ]
 
     for i in range(nodes):
-        filename = f"{WORKDIR}/{name}{i+1}/config/genesis.json"
+        filename = f"{WORKDIR}/{prefix}{i+1}/config/genesis.json"
         json.dump(genesis, open(filename, "w"))
 
     app_toml = jinja2.Template(
@@ -226,7 +229,7 @@ def init_chain(name, chain_id, binary, denom, nodes, port_prefix, mnemonics, pod
     for i, validator in enumerate(info["validators"]):
         # validator nodes
 
-        home = f"{WORKDIR}/{name}{i+1}"
+        home = f"{WORKDIR}/{prefix}{i+1}"
 
         node_id = validator["node_id"]
 
@@ -247,6 +250,7 @@ def init_chain(name, chain_id, binary, denom, nodes, port_prefix, mnemonics, pod
             "address": validator["address"],
             "valoper": validator["valoper"],
             "chain_id": chain_id,
+            "node_num": i+1,
             "podman": podman
         }
 
@@ -280,11 +284,14 @@ def init_chain(name, chain_id, binary, denom, nodes, port_prefix, mnemonics, pod
     for i in range(nodes):
         validator = info["validators"][i]
 
-        validator["rpc_url"] = f"http://localhost:{validator['rpc_port']}"
         validator["api_url"] = f"http://localhost:{validator['api_port']}"
+        validator["app_url"] = f"tcp://localhost:{validator['app_port']}"
+        validator["rpc_url"] = f"http://localhost:{validator['rpc_port']}"
         validator.pop("app_port")
         validator.pop("api_port")
         validator.pop("rpc_port")
+        if chain_id != "pond-1":
+            validator.pop("feeder_url")
 
         info["validators"][i] = validator
 
@@ -307,7 +314,8 @@ def main():
         "version": {
             "kujira": os.environ.get("KUJIRA_VERSION"),
             "feeder": os.environ.get("FEEDER_VERSION"),
-            "relayer": os.environ.get("RELAYER_VERSION")
+            "relayer": os.environ.get("RELAYER_VERSION"),
+            "prepare": os.environ.get("PREPARE_VERSION")
         }
     }
 
@@ -330,8 +338,7 @@ def main():
         "pond-2": info2["validators"]
     }
 
-    config["wallets"] = info1["accounts"]
-    config["ibc"] = info1["ibc"]
+    config["accounts"] = info1["accounts"]
 
     # init relayer
 

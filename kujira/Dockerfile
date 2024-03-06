@@ -4,8 +4,9 @@ FROM golang:${go_version} AS build
 ARG kujira_version
 
 WORKDIR /build
-RUN git clone --depth 1 --branch ${kujira_version} https://github.com/Team-Kujira/core.git && \
+RUN git clone https://github.com/Team-Kujira/core.git && \
     cd core && \
+    git checkout ${kujira_version} && \
     make install
 
 WORKDIR /dist
