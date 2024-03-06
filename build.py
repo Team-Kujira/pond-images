@@ -88,9 +88,6 @@ def manifest(command, namespace, app, tag, archs, push=False):
     fulltag = f"{namespace}/{app}:{tag}"
     commands = []
 
-    print("------------------")
-    print(fulltag)
-
     tags = [f"{fulltag}-{x}" for x in archs.split(",")]
     commands.append([command, "manifest", "create", f"{fulltag}"] + tags)
 
@@ -132,7 +129,7 @@ def main():
         build(command, args.namespace, app, tag, versions, args.push)
 
         if not args.manifest:
-            return
+            continue
 
         archs = args.archs
         if not archs:
