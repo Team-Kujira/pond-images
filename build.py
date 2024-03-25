@@ -46,26 +46,25 @@ def build(command, namespace, app, tag, versions, push=False):
 
     cmd = [command, "build", "--tag", fulltag]
 
-    if app in ["feeder", "kujira", "relayer"]:
-        go_version = versions["go"].get(app, {}).get(tag)
-        if not go_version:
-            print(f"no go version defined for {app}:{tag}")
-            sys.exit(1)
+    go_version = versions["go"].get(app, {}).get(tag)
+    if not go_version:
+        print(f"no go version defined for {app}:{tag}")
+        sys.exit(1)
 
-        cmd += build_arg(f"{app}_version={tag}")
-        cmd += build_arg(f"go_version={go_version}")
+    cmd += build_arg(f"{app}_version={tag}")
+    cmd += build_arg(f"go_version={go_version}")
 
-    if app == "prepare":
-        kujira_version = get_version(versions, "kujira", tag)
-        feeder_version = get_version(versions, "feeder", tag)
-        relayer_version = get_version(versions, "relayer", tag)
+    # if app == "prepare":
+    #     kujira_version = get_version(versions, "kujira", tag)
+    #     feeder_version = get_version(versions, "feeder", tag)
+    #     relayer_version = get_version(versions, "relayer", tag)
 
-        cmd += build_arg(f"kujira_version={kujira_version}")
-        cmd += build_arg(f"feeder_version={feeder_version}")
-        cmd += build_arg(f"relayer_version={relayer_version}")
-        cmd += build_arg(f"prepare_version={tag}")
-        cmd += build_arg(f"namespace={namespace}")
-        cmd += build_arg(f"arch={arch}")
+    #     cmd += build_arg(f"kujira_version={kujira_version}")
+    #     cmd += build_arg(f"feeder_version={feeder_version}")
+    #     cmd += build_arg(f"relayer_version={relayer_version}")
+    #     cmd += build_arg(f"prepare_version={tag}")
+    #     cmd += build_arg(f"namespace={namespace}")
+    #     cmd += build_arg(f"arch={arch}")
 
     cmd.append(app)
 

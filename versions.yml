@@ -1,6 +1,6 @@
 pond:
   latest:
-    kujira: 03985a2
+    kujira: d54e219
     feeder: api-only
     relayer: v2.5.1
   v0.1.0:
@@ -11,14 +11,35 @@ pond:
     kujira: 03985a2
     feeder: api-only
     relayer: v2.5.2
+  v0.9.3-1:
+    kujira: v0.9.3-1
+    feeder: api-only
+    relayer: v2.5.2
+  next:
+    kujira: next
+    feeder: api-only
+    relayer: v2.5.2
+  sdk-50:
+    kujira: 99f7924
+    cosmoshub: v15.1.0
+    terra2: v2.10.5
+    feeder: api-only
+    relayer: v2.5.2
 
 go:
   kujira:
     v0.9.3-1:  1.20.2
-    03985a2:  1.21.3
+    next:  1.21.8
+    03985a2: 1.21.3
+    d54e219: 1.21.3
+    99f7924: 1.21.8
   feeder:
     v0.11.0: 1.20.2
-    api-only: 1.21.3
+    api-only: 1.21.8
   relayer:
     v2.5.1: 1.21.7
-    v2.5.2: 1.21.7
+    v2.5.2: 1.21.8
+  cosmoshub:
+    v15.1.0: 1.21.8
+  terra2:
+    v2.10.5: 1.20.14
