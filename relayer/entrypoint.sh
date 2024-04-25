@@ -1,10 +1,10 @@
 #!/bin/bash
 
 if [ -n "$USER" ]; then
-    useradd -u $USER kujira -d /kujira -m
-    chown -R kujira /kujira
+    useradd -u $USER relayer
+    chown -R relayer /home/relayer
 
-    exec runuser -u kujira -- "$@"
+    exec runuser -u relayer -- $@
 else
     $@
 fi

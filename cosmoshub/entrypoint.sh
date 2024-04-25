@@ -1,10 +1,10 @@
 #!/bin/bash
 
 if [ -n "$USER" ]; then
-    useradd -u $USER cosmos -d /tmp/cosmoshub
-    chown -R cosmoshub /cosmoshub
+    useradd -u $USER cosmoshub
+    chown -R cosmoshub /home/cosmoshub
 
-    exec runuser -u cosmoshub -- "$@"
+    exec runuser -u cosmoshub -- $@
 else
     $@
 fi

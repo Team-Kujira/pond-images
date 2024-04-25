@@ -26,6 +26,7 @@ pond:
     terra2: v2.10.5
     feeder: api-only
     relayer: v2.5.2
+    proxy: v1.0.0-rc1
 
 go:
   kujira:

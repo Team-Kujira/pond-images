@@ -77,10 +77,13 @@ def manifest(command, namespace, app, tag, archs, push=False):
     commands = []
 
     tags = [f"{fulltag}-{x}" for x in archs.split(",")]
-    commands.append([command, "manifest", "create", f"{fulltag}"] + tags)
+    commands.append([command, "manifest", "create", fulltag] + tags)
 
     if push:
-        commands.append([command, "manifest", "push", f"{fulltag}"])
+        if command == "podman":
+            commands.append([command, "manifest", "push", fulltag, fulltag])
+        else:
+            commands.append([command, "manifest", "push", fulltag])
 
     for cmd in commands:
         print(cmd)
@@ -101,7 +104,7 @@ def main():
     if args.podman:
         command = "podman"
 
-    apps = ["kujira", "feeder", "relayer", "proxy"]
+    apps = ["kujira", "feeder", "relayer", "proxy", "terra2", "cosmoshub"]
     if args.app:
         apps = [args.app]
 
