@@ -11,6 +11,7 @@ RUN git clone https://github.com/neutron-org/neutron && \
 
 WORKDIR /dist
 RUN mkdir bin lib && \
+    mv $(ldd /go/bin/neutrond | egrep "libwasmvm.[^\.]+.so" | awk '{print $3}') lib/ && \
     mv /go/bin/neutrond bin/
 
 FROM ubuntu:latest
