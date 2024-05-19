@@ -5,8 +5,6 @@ import platform
 import subprocess
 import sys
 import yaml
-from datetime import datetime, timezone
-import requests
 import re
 import os
 
