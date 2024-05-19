@@ -17,7 +17,6 @@ APPS = [
     "proxy",
     "terra2",
     "cosmoshub",
-    "neutron"
 ]
 
 
