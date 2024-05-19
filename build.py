@@ -5,7 +5,20 @@ import platform
 import subprocess
 import sys
 import yaml
-import datetime as dt
+from datetime import datetime, timezone
+import requests
+import re
+import os
+
+APPS = [
+    "kujira",
+    "feeder",
+    "relayer",
+    "proxy",
+    "terra2",
+    "cosmoshub",
+    "neutron"
+]
 
 
 def parse_args():
@@ -43,15 +56,16 @@ def build(command, namespace, app, tag, versions, push=False):
         arch = "amd64"
 
     fulltag = f"{namespace}/{app}:{tag}-{arch}"
+    version = "-".join(tag.split("-")[:-1])
 
     cmd = [command, "build", "--tag", fulltag]
 
-    go_version = versions["go"].get(app, {}).get(tag)
+    go_version = versions["go"].get(app, {}).get(version)
     if not go_version and app != "proxy":
         print(f"no go version defined for {app}:{tag}")
         sys.exit(1)
 
-    cmd += build_arg(f"{app}_version={tag}")
+    cmd += build_arg(f"{app}_version={version}")
     if go_version:
         cmd += build_arg(f"go_version={go_version}")
 
@@ -90,29 +104,56 @@ def manifest(command, namespace, app, tag, archs, push=False):
         subprocess.run(cmd)
 
 
+def check_version(version):
+    pattern = r"^[a-z\d\._-]+-(rc)?\d+$"
+    if re.match(pattern, version):
+        return
+    # if re.match(r"^v(\d+\.){2}\d+-[a-z\d]+$", version):
+    #     return
+
+    print(f"version '{version}' doesn't match 'xyz-n'")
+    sys.exit(1)
+
+
+def load_versions(version):
+    versions = {}
+
+    for filename in ["go.yml", f"{version}.yml"]:
+        if not os.path.exists(f"versions.d/{filename}"):
+            print(f"versions.d/{filename} not found")
+            sys.exit(1)
+
+        data = yaml.safe_load(open(f"versions.d/{filename}", "r"))
+
+        if filename == "go.yml":
+            versions["go"] = data
+        else:
+            for tag in data.values():
+                check_version(tag)
+
+            versions["pond"] = data
+
+    return versions
+
+
 def main():
     args = parse_args()
 
-    versions = yaml.safe_load(open("versions.yml", "r"))
-
-    pond_version = args.tag
-    if not pond_version:
-        pond_version = dt.datetime.utcnow().strftime("%Y%m%d%H%M%S")
-        versions["pond"][pond_version] = versions["pond"]["latest"]
+    versions = load_versions(args.tag)
 
     command = "docker"
     if args.podman:
         command = "podman"
 
-    apps = ["kujira", "feeder", "relayer", "proxy", "terra2", "cosmoshub"]
+    apps = APPS
     if args.app:
         apps = [args.app]
 
     for app in apps:
-        tag = versions["pond"][pond_version].get(app)
+        tag = versions["pond"].get(app)
 
         if not tag:
-            print(f"no tag defined for {app} ({pond_version})")
+            print(f"no tag defined for {app} ({args.tag})")
             sys.exit(1)
 
         build(command, args.namespace, app, tag, versions, args.push)

@@ -27,11 +27,18 @@ pond:
     feeder: api-only
     relayer: v2.5.2
     proxy: v1.0.0-rc1
+  v1.0.0-rc1:
+    kujira: 99f7924-1
+    cosmoshub: v16.0.0-1
+    terra2: v2.11.1-1
+    feeder: api-only-1
+    relayer: v2.5.2-1
+    proxy: v1.0.0-1
 
 go:
   kujira:
-    v0.9.3-1:  1.20.2
-    next:  1.21.8
+    v0.9.3-1: 1.20.2
+    next: 1.21.8
     03985a2: 1.21.3
     d54e219: 1.21.3
     99f7924: 1.21.8
@@ -43,5 +50,9 @@ go:
     v2.5.2: 1.21.8
   cosmoshub:
     v15.1.0: 1.21.8
+    v16.0.0: 1.21.8
   terra2:
     v2.10.5: 1.20.14
+    v2.11.1: 1.20.14
+  neutron:
+    v3.0.5: 1.21.8
