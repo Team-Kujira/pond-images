@@ -19,6 +19,8 @@ FROM ubuntu:latest
 COPY --from=build /dist/bin/* /usr/local/bin/
 COPY --from=build /dist/lib/* /usr/lib/
 
+COPY entrypoint.sh /usr/local/bin/
+
 RUN chmod +x /usr/local/bin/*
 
 ENTRYPOINT ["entrypoint.sh"]
