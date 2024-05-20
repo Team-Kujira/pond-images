@@ -20,3 +20,5 @@ COPY --from=build /dist/bin/* /usr/local/bin/
 COPY --from=build /dist/lib/* /usr/lib/
 
 RUN chmod +x /usr/local/bin/*
+
+ENTRYPOINT ["entrypoint.sh"]
