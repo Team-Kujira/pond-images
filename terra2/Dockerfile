@@ -15,6 +15,7 @@ RUN mkdir bin lib && \
     mv /go/bin/terrad bin/
 
 FROM ubuntu:latest
+RUN userdel ubuntu
 
 COPY --from=build /dist/bin/* /usr/local/bin/
 COPY --from=build /dist/lib/* /usr/lib/

@@ -14,6 +14,7 @@ RUN mkdir bin lib && \
     mv /go/bin/gaiad bin/
 
 FROM ubuntu:latest
+RUN userdel ubuntu
 
 COPY --from=build /dist/bin/* /usr/local/bin/
 

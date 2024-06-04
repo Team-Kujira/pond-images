@@ -13,6 +13,7 @@ RUN mkdir bin && \
     mv /go/bin/price-feeder bin/
 
 FROM ubuntu:latest
+RUN userdel ubuntu
 
 RUN apt-get update && apt-get install --yes ca-certificates
 
