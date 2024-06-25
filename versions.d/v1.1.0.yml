@@ -1,7 +1,7 @@
 ---
-kujira: 99f7924-2
+kujira: v1.1.0-1
 cosmoshub: v16.0.0-2
 terra2: v2.11.1-4
 feeder: api-only-2
 relayer: v2.5.2-2
-proxy: v1.0.0-2
+proxy: v1.0.0-1
