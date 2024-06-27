@@ -11,12 +11,14 @@ RUN git clone https://github.com/cosmos/gaia && \
 
 WORKDIR /dist
 RUN mkdir bin lib && \
+    mv $(ldd /go/bin/gaiad | egrep "libwasmvm.[^\.]+.so" | awk '{print $3}') lib/ && \
     mv /go/bin/gaiad bin/
 
 FROM ubuntu:latest
 RUN userdel ubuntu
 
 COPY --from=build /dist/bin/* /usr/local/bin/
+COPY --from=build /dist/lib/* /usr/lib/
 
 COPY entrypoint.sh /usr/local/bin/
 
