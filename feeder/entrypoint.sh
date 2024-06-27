@@ -1,10 +1,10 @@
 #!/bin/bash
 
 if [ -n "$USER" ]; then
-    useradd -u $USER -md /feeder feeder
-    chown -R feeder /feeder
+    useradd -u $USER feeder
+    chown -R feeder /home/feeder
 
-    exec runuser -u feeder -- "$@"
+    exec runuser -u feeder -- $@
 else
     $@
 fi

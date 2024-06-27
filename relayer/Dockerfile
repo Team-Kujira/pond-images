@@ -14,10 +14,11 @@ RUN mkdir bin && \
     mv /go/bin/rly bin/
 
 FROM ubuntu:latest
+RUN userdel ubuntu
 
 COPY --from=build /dist/bin/* /usr/local/bin/
 
-COPY entrypoint.sh link-and-start-pond.sh /usr/local/bin/
+COPY entrypoint.sh link-and-start.sh /usr/local/bin/
 
 RUN chmod +x /usr/local/bin/*
 

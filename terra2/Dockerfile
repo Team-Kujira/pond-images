@@ -1,18 +1,18 @@
 ARG go_version
 FROM golang:${go_version} AS build
 
-ARG kujira_version
+ARG terra2_version
 
 WORKDIR /build
-RUN git clone https://github.com/Team-Kujira/core.git && \
+RUN git clone https://github.com/terra-money/core && \
     cd core && \
-    git checkout ${kujira_version} && \
+    git checkout ${terra2_version} && \
     make install
 
 WORKDIR /dist
 RUN mkdir bin lib && \
-    mv $(ldd /go/bin/kujirad | egrep "libwasmvm.[^\.]+.so" | awk '{print $3}') lib/ && \
-    mv /go/bin/kujirad bin/
+    mv $(ldd /go/bin/terrad | egrep "libwasmvm.[^\.]+.so" | awk '{print $3}') lib/ && \
+    mv /go/bin/terrad bin/
 
 FROM ubuntu:latest
 RUN userdel ubuntu
